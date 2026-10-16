@@ -9,7 +9,16 @@ CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen3:4b")
 
 _client = ollama.Client(host=OLLAMA_URL)
 
-SYSTEM_PROMPT = "You are a helpful study assistant. Use the lecture slides below to answer the question."
+NOT_COVERED = "Not covered in the slides."
+
+SYSTEM_PROMPT = f"""You are a study assistant for university lecture slides.
+
+Rules:
+1. Answer ONLY with information from the slides you are given. Never use outside knowledge.
+2. After every sentence, cite the slide it comes from with its ID in square brackets, e.g. [L05-s12].
+3. Only cite IDs that appear in the slides you are given.
+4. If the slides do not contain the answer, reply with exactly: {NOT_COVERED}
+5. Keep the answer short and clear."""
 
 
 def format_sources(slides: list[dict]) -> str:
@@ -27,4 +36,5 @@ def generate_answer(question: str, slides: list[dict]) -> str:
         ],
         think=False,  # Qwen3 can "think" before answering; off = faster
     )
-    return response.message.content
+    # Some Qwen3 builds still write their reasoning, ending with "</think>". Keep only the answer.
+    return response.message.content.split("</think>")[-1].strip()
