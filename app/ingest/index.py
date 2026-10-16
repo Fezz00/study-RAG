@@ -1,0 +1,68 @@
+"""Parse a lecture PDF, embed every slide and store it in Qdrant.
+
+Usage:
+    python -m app.ingest.index data/lecture04.pdf
+"""
+
+import os
+import sys
+import uuid
+
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, PointStruct, VectorParams
+
+from app.ingest.embed import embed_texts
+from app.ingest.parse_pdf import parse_pdf
+
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+COLLECTION = os.getenv("QDRANT_COLLECTION", "slides")
+
+
+def point_id(slide_id: str) -> str:
+    """Qdrant only accepts integers or UUIDs as IDs, so derive a UUID from 'L04-s12'.
+
+    The same slide always gets the same UUID, so re-indexing a lecture
+    overwrites its slides instead of adding duplicates.
+    """
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, slide_id))
+
+
+def index_pdf(pdf_path: str, client: QdrantClient) -> int:
+    """Index one PDF and return how many slides were stored."""
+    chunks = parse_pdf(pdf_path)
+    if not chunks:
+        return 0
+
+    vectors = embed_texts([chunk["text"] for chunk in chunks])
+
+    if not client.collection_exists(COLLECTION):
+        client.create_collection(
+            collection_name=COLLECTION,
+            vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+        )
+
+    points = [
+        PointStruct(
+            id=point_id(chunk["id"]),
+            vector=vector,
+            payload={
+                "slide_id": chunk["id"],
+                "lecture": chunk["lecture"],
+                "slide": chunk["slide"],
+                "text": chunk["text"],
+            },
+        )
+        for chunk, vector in zip(chunks, vectors)
+    ]
+    client.upsert(collection_name=COLLECTION, points=points)
+    return len(points)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python -m app.ingest.index <path-to-pdf>")
+        sys.exit(1)
+
+    client = QdrantClient(url=QDRANT_URL)
+    count = index_pdf(sys.argv[1], client)
+    print(f"Indexed {count} slides into collection '{COLLECTION}'")
