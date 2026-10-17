@@ -1,0 +1,48 @@
+{"question": "What does a convolution layer compute when it slides a filter over the image?", "expected_slides": ["L05-s49", "L05-s50", "L05-s51", "L05-s116", "L05-s117"], "must_mention": ["dot product"]}
+{"question": "Why do fully connected layers work badly on images compared to convolution layers?", "expected_slides": ["L05-s28", "L05-s48"], "must_mention": ["spatial structure"]}
+{"question": "How deep is a convolution filter compared to the input volume?", "expected_slides": ["L05-s50"], "must_mention": ["full depth"]}
+{"question": "How large is the dot product a 5x5x3 filter computes at one position?", "expected_slides": ["L05-s51", "L05-s116", "L05-s117"], "must_mention": ["75"]}
+{"question": "What is an activation map?", "expected_slides": ["L05-s56", "L05-s57", "L05-s58"], "must_mention": ["activation map"]}
+{"question": "What is the output size when 6 filters of size 3x5x5 are applied to a 3x32x32 image?", "expected_slides": ["L05-s58", "L05-s59", "L05-s60"], "must_mention": ["6x28x28"]}
+{"question": "What is the output size of a convolution with input size W and filter size K without padding?", "expected_slides": ["L05-s76", "L05-s77", "L05-s78"], "must_mention": ["w-k+1"]}
+{"question": "How can we stop feature maps from shrinking with each convolution layer?", "expected_slides": ["L05-s77", "L05-s78", "L05-s79"], "must_mention": ["padding"]}
+{"question": "Which padding keeps the output the same size as the input?", "expected_slides": ["L05-s79", "L05-s94"], "must_mention": ["(k-1)/2"]}
+{"question": "What is a receptive field in a convolutional network?", "expected_slides": ["L05-s80", "L05-s81", "L05-s82", "L05-s83"], "must_mention": ["receptive field"]}
+{"question": "How big is the receptive field after L convolution layers with kernel size K?", "expected_slides": ["L05-s81", "L05-s82", "L05-s83"], "must_mention": ["(k-1)"]}
+{"question": "Why do we need to downsample inside a convolutional network?", "expected_slides": ["L05-s82", "L05-s83"], "must_mention": ["downsampl"]}
+{"question": "What is a strided convolution?", "expected_slides": ["L05-s84", "L05-s85", "L05-s86", "L05-s87"], "must_mention": ["stride"]}
+{"question": "What is the output size for a 7x7 input with a 3x3 filter and stride 2?", "expected_slides": ["L05-s86", "L05-s87"], "must_mention": ["3x3"]}
+{"question": "What is the general formula for the output size of a convolution with padding and stride?", "expected_slides": ["L05-s87", "L05-s94", "L05-s111", "L05-s112"], "must_mention": ["/s+1"]}
+{"question": "An input of 3x32x32 goes through ten 5x5 filters with stride 1 and padding 2. What is the output volume size?", "expected_slides": ["L05-s89", "L05-s90", "L05-s91", "L05-s92", "L05-s93"], "must_mention": ["10x32x32"]}
+{"question": "How many learnable parameters does a layer with ten 5x5 filters on a 3-channel input have?", "expected_slides": ["L05-s91", "L05-s92", "L05-s93"], "must_mention": ["760"]}
+{"question": "How many multiply-add operations does the convolution example with ten 5x5 filters on a 3x32x32 input need?", "expected_slides": ["L05-s93"], "must_mention": ["768"]}
+{"question": "What are the hyperparameters of a convolution layer?", "expected_slides": ["L05-s94", "L05-s111", "L05-s112", "L05-s115"], "must_mention": ["stride", "padding"]}
+{"question": "What does a 1x1 convolution do?", "expected_slides": ["L05-s113", "L05-s114"], "must_mention": ["1x1"]}
+{"question": "What is a pooling layer used for?", "expected_slides": ["L05-s101", "L05-s102", "L05-s121"], "must_mention": ["downsampl"]}
+{"question": "What is max pooling?", "expected_slides": ["L05-s102", "L05-s103", "L05-s122", "L05-s123"], "must_mention": ["max"]}
+{"question": "How many learnable parameters does a pooling layer have?", "expected_slides": ["L05-s102", "L05-s103", "L05-s123", "L05-s124"], "must_mention": ["parameters"]}
+{"question": "What is the formula for the output size of a pooling layer?", "expected_slides": ["L05-s103", "L05-s124"], "must_mention": ["/s+1"]}
+{"question": "What is the most common setting for pooling layers?", "expected_slides": ["L05-s103"], "must_mention": ["2x"]}
+{"question": "What does translation equivariance mean for convolution and pooling?", "expected_slides": ["L05-s104", "L05-s105", "L05-s106"], "must_mention": ["translat"]}
+{"question": "What do first-layer convolution filters usually learn?", "expected_slides": ["L05-s68"], "must_mention": ["edges"]}
+{"question": "What do deeper convolution layers tend to learn?", "expected_slides": ["L05-s69"], "must_mention": ["larger structures"]}
+{"question": "Which part of the input does each neuron in a fully connected layer look at?", "expected_slides": ["L05-s47", "L05-s119", "L05-s126"], "must_mention": ["input volume"]}
+{"question": "What is the neuron view of a convolution layer?", "expected_slides": ["L05-s116", "L05-s117", "L05-s118"], "must_mention": ["local connectivity"]}
+{"question": "What are the recent trends in ConvNet architectures?", "expected_slides": ["L05-s125"], "must_mention": ["smaller filters"]}
+{"question": "What is the problem with linear classifiers?", "expected_slides": ["L05-s9"], "must_mention": ["template"]}
+{"question": "How does the Histogram of Oriented Gradients (HoG) feature work?", "expected_slides": ["L05-s23"], "must_mention": ["8x8"]}
+{"question": "How does the bag of words image feature work?", "expected_slides": ["L05-s24"], "must_mention": ["codebook"]}
+{"question": "Who created AlexNet and when?", "expected_slides": ["L05-s34", "L05-s26", "L05-s137"], "must_mention": ["2012"]}
+{"question": "What did LeCun, Bottou, Bengio and Haffner publish in 1998?", "expected_slides": ["L05-s33", "L05-s29", "L05-s30", "L05-s31", "L05-s32"], "must_mention": ["document recognition"]}
+{"question": "What did Hubel and Wiesel study?", "expected_slides": ["L05-s138"], "must_mention": ["receptive fields"]}
+{"question": "What is the Neocognitron?", "expected_slides": ["L05-s141"], "must_mention": ["fukushima"]}
+{"question": "When did transformers start being used for vision tasks?", "expected_slides": ["L05-s39", "L05-s40", "L05-s41"], "must_mention": ["2021"]}
+{"question": "What was the Mark I Perceptron?", "expected_slides": ["L05-s133"], "must_mention": ["rosenblatt"]}
+{"question": "What is dropout and how does it prevent overfitting?", "expected_slides": [], "must_mention": []}
+{"question": "How does batch normalization work?", "expected_slides": [], "must_mention": []}
+{"question": "How does self-attention in a transformer compute its output?", "expected_slides": [], "must_mention": []}
+{"question": "How does an LSTM cell work?", "expected_slides": [], "must_mention": []}
+{"question": "How do generative adversarial networks train the generator and discriminator?", "expected_slides": [], "must_mention": []}
+{"question": "What is reinforcement learning?", "expected_slides": [], "must_mention": []}
+{"question": "What is the capital of France?", "expected_slides": [], "must_mention": []}
+{"question": "How do I bake bread?", "expected_slides": [], "must_mention": []}
