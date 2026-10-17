@@ -13,7 +13,7 @@ If the slides don't contain the answer, it says **"Not covered in the slides."**
 With [Docker Desktop](https://www.docker.com/products/docker-desktop/) and [Ollama](https://ollama.com) installed:
 
 ```bash
-ollama pull nomic-embed-text && ollama pull qwen3:4b
+ollama pull nomic-embed-text && ollama pull qwen3:4b-instruct
 docker compose up --build
 ```
 
@@ -45,7 +45,7 @@ flowchart LR
         UI["Streamlit UI<br/>:8501"] -- HTTP --> API["FastAPI<br/>:8000"]
         API --> Q[("Qdrant<br/>:6333")]
     end
-    API -- "host.docker.internal:11434" --> O["Ollama on the Mac<br/>nomic-embed-text + qwen3:4b"]
+    API -- "host.docker.internal:11434" --> O["Ollama on the Mac<br/>nomic-embed-text + qwen3:4b-instruct"]
 ```
 
 Ollama runs natively instead of in a container: Docker on macOS has no GPU access, so models inside a container would run on the CPU only.
@@ -113,7 +113,7 @@ Copy `.env.example` to `.env` to change settings; Docker Compose reads it automa
 
 | Variable | Default | Used for |
 |---|---|---|
-| `CHAT_MODEL` | `qwen3:4b` | Answer model |
+| `CHAT_MODEL` | `qwen3:4b-instruct` | Answer model |
 | `EMBED_MODEL` | `nomic-embed-text` | Embedding model |
 | `TOP_K` | `5` | Number of slides retrieved per question |
 | `MIN_SCORE` | `0.5` | Minimum similarity before the LLM is asked |
@@ -175,7 +175,7 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 | PDF parsing | PyMuPDF | Fast, reads text page by page, so each chunk keeps its slide number |
 | Embeddings | `nomic-embed-text` via Ollama | Small BERT-style encoder, good for English technical text |
 | Vector database | Qdrant | One container, simple Python client, metadata filters |
-| LLM | `qwen3:4b` via Ollama | Open model, runs locally; switching models is one setting |
+| LLM | `qwen3:4b-instruct` via Ollama | Open model, runs locally, answers without a slow "thinking" phase; switching models is one setting |
 | API | FastAPI + uvicorn | Request validation and interactive docs from type hints |
 | UI | Streamlit | A working web UI in about 80 lines of Python |
 | Packaging | Docker Compose | One command starts the whole system |
