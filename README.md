@@ -4,6 +4,8 @@ A self-hosted assistant that answers questions about lecture slides and cites th
 
 If the slides don't contain the answer, it says **"Not covered in the slides."** instead of guessing.
 
+![Demo: asking a question and getting an answer with slide citations](docs/demo.gif)
+
 > **Status:** Phase 2 done – web UI, REST API and one-command start with Docker Compose. Evaluation and CI/CD are next.
 
 ## Quick start
