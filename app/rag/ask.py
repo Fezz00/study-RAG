@@ -4,15 +4,12 @@ Usage:
     python -m app.rag.ask "What is dropout?"
 """
 
-import os
 import re
 import sys
 
+from app.config import MIN_SCORE, TOP_K
 from app.rag.generate import NOT_COVERED, generate_answer
 from app.rag.retrieve import retrieve
-
-# Below this similarity the best slide is clearly unrelated, so we skip the LLM.
-MIN_SCORE = float(os.getenv("MIN_SCORE", "0.5"))
 
 CITATION_PATTERN = re.compile(r"L\d+-s\d+")
 
@@ -38,10 +35,10 @@ def validate_citations(answer: str, slides: list[dict]) -> tuple[str, list[dict]
     return cleaned.strip(), [retrieved[slide_id] for slide_id in cited_ids]
 
 
-def ask(question: str, top_k: int = 5) -> dict:
+def ask(question: str, top_k: int = TOP_K) -> dict:
     slides = retrieve(question, top_k=top_k)
 
-    # Layer 1: nothing similar enough was found -> don't even ask the LLM.
+    # Layer 1: below MIN_SCORE the best slide is clearly unrelated -> don't even ask the LLM.
     if not slides or slides[0]["score"] < MIN_SCORE:
         return {"answer": NOT_COVERED, "citations": [], "sources": slides}
 
