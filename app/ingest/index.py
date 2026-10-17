@@ -4,18 +4,16 @@ Usage:
     python -m app.ingest.index data/lecture04.pdf
 """
 
-import os
 import sys
 import uuid
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
+from app.config import QDRANT_COLLECTION as COLLECTION
+from app.config import QDRANT_URL
 from app.ingest.embed import embed_texts
 from app.ingest.parse_pdf import parse_pdf
-
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-COLLECTION = os.getenv("QDRANT_COLLECTION", "slides")
 
 
 def point_id(slide_id: str) -> str:
