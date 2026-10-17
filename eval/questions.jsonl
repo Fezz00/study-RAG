@@ -22,7 +22,7 @@
 {"question": "What is max pooling?", "expected_slides": ["L05-s102", "L05-s103", "L05-s122", "L05-s123"], "must_mention": ["max"]}
 {"question": "How many learnable parameters does a pooling layer have?", "expected_slides": ["L05-s102", "L05-s103", "L05-s123", "L05-s124"], "must_mention": ["parameters"]}
 {"question": "What is the formula for the output size of a pooling layer?", "expected_slides": ["L05-s103", "L05-s124"], "must_mention": ["/s+1"]}
-{"question": "What is the most common setting for pooling layers?", "expected_slides": ["L05-s103"], "must_mention": ["2x"]}
+{"question": "What is the most common setting for pooling layers?", "expected_slides": ["L05-s103", "L05-s102", "L05-s122", "L05-s123"], "must_mention": ["2x"]}
 {"question": "What does translation equivariance mean for convolution and pooling?", "expected_slides": ["L05-s104", "L05-s105", "L05-s106"], "must_mention": ["translat"]}
 {"question": "What do first-layer convolution filters usually learn?", "expected_slides": ["L05-s68"], "must_mention": ["edges"]}
 {"question": "What do deeper convolution layers tend to learn?", "expected_slides": ["L05-s69"], "must_mention": ["larger structures"]}
