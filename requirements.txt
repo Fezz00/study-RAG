@@ -1,8 +1,7 @@
+# API and RAG pipeline (the UI has its own ui/requirements.txt)
 pymupdf>=1.24
 qdrant-client>=1.12
 ollama>=0.4
 fastapi>=0.115
 uvicorn>=0.32
 python-multipart>=0.0.12
-streamlit>=1.40
-requests>=2.32

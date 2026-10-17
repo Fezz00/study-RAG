@@ -1,0 +1,16 @@
+# Keep these out of the images: big, private or not needed to run the app
+.git
+.venv
+venv
+data
+**/__pycache__
+*.pyc
+.env
+*.pdf
+*.txt
+!requirements.txt
+!ui/requirements.txt
+*.md
+.DS_Store
+.vscode
+.idea
