@@ -2,13 +2,14 @@
 
 from qdrant_client import QdrantClient
 
+from app.config import QDRANT_COLLECTION as COLLECTION
+from app.config import QDRANT_URL, TOP_K
 from app.ingest.embed import embed_texts
-from app.ingest.index import COLLECTION, QDRANT_URL
 
 _client = QdrantClient(url=QDRANT_URL)
 
 
-def retrieve(question: str, top_k: int = 5) -> list[dict]:
+def retrieve(question: str, top_k: int = TOP_K) -> list[dict]:
     """Embed the question and return the top_k closest slides, best first.
 
     Each result is the slide's payload plus its similarity score.

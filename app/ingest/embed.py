@@ -1,11 +1,8 @@
 """Turn texts into embedding vectors with a local Ollama model."""
 
-import os
-
 import ollama
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
+from app.config import EMBED_MODEL, OLLAMA_URL
 
 _client = ollama.Client(host=OLLAMA_URL)
 

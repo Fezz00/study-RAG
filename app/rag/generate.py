@@ -1,11 +1,8 @@
 """Build a prompt from retrieved slides and ask the chat model for an answer."""
 
-import os
-
 import ollama
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen3:4b")
+from app.config import CHAT_MODEL, OLLAMA_URL
 
 _client = ollama.Client(host=OLLAMA_URL)
 
