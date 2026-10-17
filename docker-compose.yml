@@ -21,7 +21,7 @@ services:
       OLLAMA_URL: http://host.docker.internal:11434
       DATA_DIR: /app/data
       # Optional overrides from a .env file, with defaults after ":-"
-      CHAT_MODEL: ${CHAT_MODEL:-qwen3:4b}
+      CHAT_MODEL: ${CHAT_MODEL:-qwen3:4b-instruct}
       EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
       TOP_K: ${TOP_K:-5}
       MIN_SCORE: ${MIN_SCORE:-0.5}
