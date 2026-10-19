@@ -1,0 +1,3 @@
+# Tools for development and CI, not needed to run the app
+-r requirements.txt
+pytest>=8.3
