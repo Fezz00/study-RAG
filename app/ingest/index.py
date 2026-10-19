@@ -8,7 +8,15 @@ import sys
 import uuid
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    FilterSelector,
+    MatchValue,
+    PointStruct,
+    VectorParams,
+)
 
 from app.config import QDRANT_COLLECTION as COLLECTION
 from app.config import QDRANT_URL
@@ -37,6 +45,14 @@ def index_pdf(pdf_path: str, client: QdrantClient) -> int:
         client.create_collection(
             collection_name=COLLECTION,
             vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+        )
+    else:
+        # Re-indexing replaces the whole lecture, so slides that are now skipped don't linger.
+        client.delete(
+            collection_name=COLLECTION,
+            points_selector=FilterSelector(
+                filter=Filter(must=[FieldCondition(key="lecture", match=MatchValue(value=chunks[0]["lecture"]))])
+            ),
         )
 
     points = [
