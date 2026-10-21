@@ -24,7 +24,7 @@ def api_status() -> dict | None:
 
 st.set_page_config(page_title="Lecture Study Assistant", page_icon="📚")
 st.title("📚 Lecture Study Assistant")
-st.caption("Answers only from your lecture slides, with the slide numbers as sources.")
+st.caption("Answers only from your lecture slides, with the slide numbers as sources. Deployed with GitOps 🚀")
 
 
 # --- Sidebar: status and upload ----------------------------------------------
