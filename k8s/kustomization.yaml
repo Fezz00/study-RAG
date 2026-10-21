@@ -10,6 +10,7 @@ resources:
   - qdrant.yaml
   - api.yaml
   - ui.yaml
+  - ingress.yaml
 
 # The image versions to deploy. Later, CI will update these tags automatically.
 images:
