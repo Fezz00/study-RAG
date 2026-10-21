@@ -1,0 +1,66 @@
+# The FastAPI backend.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 2 # two copies, so one can be replaced while the other keeps serving
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # never go below 2 ready pods during an update -> zero downtime
+      maxSurge: 1 # start one new pod at a time
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull # created by scripts/cluster-up.sh
+      containers:
+        - name: api
+          image: ghcr.io/fezz00/study-rag-api # tag is set in kustomization.yaml
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: app-config
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/data
+          # Ready = Qdrant and Ollama are reachable (/health). Until then, no traffic is sent here.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            failureThreshold: 3
+          # Alive = the server process accepts connections. Deliberately NOT /health:
+          # if Ollama is down, restarting the API wouldn't help.
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: uploads # uploaded PDFs are only needed while indexing, so a temporary folder is enough
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 8000

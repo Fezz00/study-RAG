@@ -1,0 +1,15 @@
+# Settings for the API, as environment variables (same names as in app/config.py).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  # Ollama runs natively on the Mac; minikube's name for the host machine:
+  OLLAMA_URL: http://host.minikube.internal:11434
+  # Inside the cluster, services find each other by their Service name:
+  QDRANT_URL: http://qdrant:6333
+  CHAT_MODEL: qwen3:4b-instruct
+  EMBED_MODEL: nomic-embed-text
+  TOP_K: "5"
+  MIN_SCORE: "0.5"
+  DATA_DIR: /app/data
