@@ -1,0 +1,19 @@
+# The Argo CD "Application": watch k8s/ on main in this repo and keep the cluster identical to it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: study-rag
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Fezz00/study-RAG.git
+    targetRevision: main # only merged code is deployed
+    path: k8s # Argo CD finds kustomization.yaml there
+  destination:
+    server: https://kubernetes.default.svc # this cluster
+    namespace: study-rag
+  syncPolicy:
+    automated:
+      prune: true # a resource removed from Git is removed from the cluster
+      selfHeal: true # a manual change in the cluster is reverted to what Git says

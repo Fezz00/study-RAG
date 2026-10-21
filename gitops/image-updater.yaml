@@ -1,0 +1,22 @@
+# Argo CD Image Updater: watch ghcr.io for new sha-... tags and deploy the newest one.
+# It tells Argo CD the new tag directly (write-back "argocd"), so it never commits to the protected main branch.
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: study-rag
+  namespace: argocd
+spec:
+  writeBackConfig:
+    method: argocd
+  applicationRefs:
+    - namePattern: study-rag # the Application in application.yaml
+      commonUpdateSettings:
+        updateStrategy: newest-build # the most recently built image wins
+        allowTags: "regexp:^sha-" # only CI's commit tags, never "latest"
+        pullSecret: pullsecret:argocd/ghcr-pull # copy of the cluster's ghcr.io login (see gitops-up.sh)
+        platforms: [linux/arm64] # the variant the Mac cluster runs
+      images:
+        - alias: api
+          imageName: ghcr.io/fezz00/study-rag-api
+        - alias: ui
+          imageName: ghcr.io/fezz00/study-rag-ui
