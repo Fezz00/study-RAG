@@ -1,0 +1,52 @@
+# The Streamlit web UI.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ui
+  template:
+    metadata:
+      labels:
+        app: ui
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: ui
+          image: ghcr.io/fezz00/study-rag-ui # tag is set in kustomization.yaml
+          ports:
+            - containerPort: 8501
+          env:
+            - name: API_URL
+              value: http://api:8000
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health # Streamlit's built-in health endpoint
+              port: 8501
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+spec:
+  selector:
+    app: ui
+  ports:
+    - port: 8501
