@@ -1,0 +1,19 @@
+# Kustomize ties the manifests together: kubectl apply -k k8s/
+# Argo CD (GitOps) will read this same file.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: study-rag # put everything into this namespace
+
+resources:
+  - configmap.yaml
+  - qdrant.yaml
+  - api.yaml
+  - ui.yaml
+
+# The image versions to deploy. Later, CI will update these tags automatically.
+images:
+  - name: ghcr.io/fezz00/study-rag-api
+    newTag: latest
+  - name: ghcr.io/fezz00/study-rag-ui
+    newTag: latest
