@@ -1,0 +1,17 @@
+# Helm values for the Argo CD chart (installed by scripts/gitops-up.sh).
+
+# Features we don't need locally - saves memory in the small cluster.
+dex:
+  enabled: false # single sign-on (log in with GitHub etc.); we use the admin user
+notifications:
+  enabled: false # Slack/email notifications
+
+configs:
+  params:
+    server.insecure: true # serve plain HTTP; the ingress is the entry point (no TLS locally)
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: argocd.study-rag.local # web UI -> http://argocd.study-rag.local
