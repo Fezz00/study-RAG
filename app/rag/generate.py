@@ -1,8 +1,11 @@
 """Build a prompt from retrieved slides and ask the chat model for an answer."""
 
+import time
+
 import ollama
 
 from app.config import CHAT_MODEL, OLLAMA_URL
+from app.metrics import LLM_SECONDS, LLM_TOKENS_PER_SECOND
 
 _client = ollama.Client(host=OLLAMA_URL)
 
@@ -25,6 +28,7 @@ def format_sources(slides: list[dict]) -> str:
 
 def generate_answer(question: str, slides: list[dict]) -> str:
     user_message = f"Slides:\n\n{format_sources(slides)}\n\nQuestion: {question}"
+    start = time.perf_counter()
     response = _client.chat(
         model=CHAT_MODEL,
         messages=[
@@ -33,5 +37,10 @@ def generate_answer(question: str, slides: list[dict]) -> str:
         ],
         think=False,  # Qwen3 can "think" before answering; off = faster
     )
+    LLM_SECONDS.observe(time.perf_counter() - start)
+    # Ollama reports how many tokens it generated and how long that took (in nanoseconds).
+    if response.eval_count and response.eval_duration:
+        LLM_TOKENS_PER_SECOND.observe(response.eval_count / (response.eval_duration / 1e9))
+
     # Some Qwen3 builds still write their reasoning, ending with "</think>". Keep only the answer.
     return response.message.content.split("</think>")[-1].strip()
