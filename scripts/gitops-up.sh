@@ -28,11 +28,12 @@ kubectl -n study-rag get secret ghcr-pull -o jsonpath='{.data.\.dockerconfigjson
     --from-file=.dockerconfigjson=/dev/stdin --dry-run=client -o yaml |
   kubectl apply -f -
 
-echo "==> Registering the app with Argo CD"
-kubectl apply -f gitops/application.yaml -f gitops/image-updater.yaml
+echo "==> Registering the app and the monitoring stack with Argo CD"
+kubectl apply -f gitops/application.yaml -f gitops/image-updater.yaml -f gitops/monitoring.yaml
 
 echo
 echo "Argo CD UI: http://argocd.study-rag.local  (needs 'minikube tunnel -p study-rag' and an /etc/hosts entry)"
+echo "Grafana:    http://grafana.study-rag.local (user admin, password: see START.txt / README)"
 echo "User: admin   Password:"
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
 echo

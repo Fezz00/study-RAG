@@ -1,0 +1,151 @@
+{
+  "title": "Lecture Study Assistant",
+  "uid": "study-rag",
+  "description": "Live numbers from the API's /metrics, collected by Prometheus.",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      { "name": "datasource", "label": "Data source", "type": "datasource", "query": "prometheus", "current": {} }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Answered (last 1 h)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(rag_answers_total{outcome=\"answered\"}[1h])) or vector(0)" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "fixed", "fixedColor": "green" } } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Refused (last 1 h)",
+      "description": "\"Not covered in the slides\" for any reason (low score, model, missing citation).",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(rag_answers_total{outcome!=\"answered\"}[1h])) or vector(0)" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "fixed", "fixedColor": "orange" } } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Server errors 5xx (last 1 h)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(http_request_duration_seconds_count{status=~\"5..\"}[1h])) or vector(0)" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "LLM speed (median tokens/s, 15 min)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.5, sum by (le) (rate(llm_tokens_per_second_bucket[15m])))" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "unit": "none" } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Answer time for /ask (median and 95th percentile)",
+      "description": "95th percentile: 95% of questions were answered faster than this.",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "median",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_seconds_bucket{path=\"/ask\"}[5m])))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "95th percentile",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{path=\"/ask\"}[5m])))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "LLM generation time (median and 95th percentile)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "median",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(llm_generation_seconds_bucket[5m])))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "95th percentile",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(llm_generation_seconds_bucket[5m])))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Answers by outcome (per minute)",
+      "description": "answered vs. refused_low_score (layer 1), refused_by_model (layer 2), refused_no_citation (layer 3).",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{outcome}}", "expr": "sum by (outcome) (rate(rag_answers_total[5m])) * 60" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "none", "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" } } } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Best retrieval score (median)",
+      "description": "How similar the best slide is to the question. Below 0.5 the question is refused without asking the LLM.",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "median top score",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(retrieval_top_score_bucket[10m])))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "decimals": 2 } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Requests per minute by endpoint and status",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{path}} {{status}}",
+          "expr": "sum by (path, status) (rate(http_request_duration_seconds_count{path!~\"/metrics|/health\"}[5m])) * 60"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "none" } }
+    }
+  ]
+}
