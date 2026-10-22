@@ -8,7 +8,7 @@ If the slides don't contain the answer, it says **"Not covered in the slides."**
 
 ![Demo: asking a question and getting an answer with slide citations](docs/demo.gif)
 
-> **Status:** Phase 4 done – measured with an eval set, checked by CI on every PR, and deployed to Kubernetes with GitOps: merging a PR rolls out the new version automatically, without downtime. Monitoring is next.
+> **Status:** Phase 5 done – measured with an eval set, checked by CI on every PR, deployed to Kubernetes with GitOps (merging a PR rolls out the new version automatically, without downtime), and monitored with Prometheus and Grafana.
 
 ## Highlights
 
@@ -16,6 +16,7 @@ If the slides don't contain the answer, it says **"Not covered in the slides."**
 - **Measured quality** – 48-question eval set: Hit@5 0.90, refusal accuracy 1.00
 - **CI quality gate** – lint, 26 unit tests and multi-arch image builds (amd64 + arm64, native runners) on every PR; `main` is protected
 - **Kubernetes + GitOps** – Argo CD keeps the cluster identical to `k8s/` on `main`; Argo CD Image Updater deploys every new image; zero-downtime rolling updates and self-healing
+- **Monitoring** – the API exports Prometheus metrics (latency, LLM time, tokens/s, retrieval score, answer outcomes); a Grafana dashboard defined as code shows them live
 
 ## Quick start (Docker Compose)
 
@@ -164,12 +165,12 @@ Requires Docker Desktop, [minikube](https://minikube.sigs.k8s.io/), `kubectl`, [
 ./scripts/cluster-up.sh
 
 # 2. Host names (once)
-echo "127.0.0.1 study-rag.local api.study-rag.local argocd.study-rag.local" | sudo tee -a /etc/hosts
+echo "127.0.0.1 study-rag.local api.study-rag.local argocd.study-rag.local grafana.study-rag.local" | sudo tee -a /etc/hosts
 
 # 3. Tunnel to the ingress (own terminal, keep it open)
 minikube tunnel -p study-rag
 
-# 4. Argo CD + Image Updater; registers the app – from here on Argo CD deploys it
+# 4. Argo CD + Image Updater; registers the app and the monitoring stack – from here on Argo CD deploys them
 ./scripts/gitops-up.sh
 ```
 
@@ -178,6 +179,29 @@ minikube tunnel -p study-rag
 | http://study-rag.local | UI – upload a lecture PDF first (the cluster has its own Qdrant) |
 | http://api.study-rag.local/docs | API |
 | http://argocd.study-rag.local | Argo CD (user `admin`, password printed by `gitops-up.sh`) |
+| http://grafana.study-rag.local | Grafana (user `admin`, password: `kubectl -n monitoring get secret monitoring-grafana -o jsonpath='{.data.admin-password}' \| base64 -d`) |
+
+## Monitoring
+
+![Grafana dashboard of the study assistant](docs/grafana-dashboard.png)
+
+The API measures itself with [prometheus-client](https://github.com/prometheus/client_python) and serves the numbers at `/metrics`:
+
+| Metric | Type | Shows |
+|---|---|---|
+| `http_request_duration_seconds` | histogram | latency per endpoint and status code (5xx = errors) |
+| `llm_generation_seconds` | histogram | how long Qwen takes to write an answer |
+| `llm_tokens_per_second` | histogram | generation speed, from Ollama's own token counts |
+| `retrieval_top_score` | histogram | similarity of the best slide per question |
+| `rag_answers_total{outcome}` | counter | `answered`, or which layer refused: `refused_low_score`, `refused_by_model`, `refused_no_citation` |
+
+- **Prometheus and Grafana** come from the `kube-prometheus-stack` Helm chart, installed and kept up to date by Argo CD as a second Application ([`gitops/monitoring.yaml`](gitops/monitoring.yaml), chart version pinned).
+- **A ServiceMonitor** ([`k8s/servicemonitor.yaml`](k8s/servicemonitor.yaml)) tells Prometheus to read the API's `/metrics` every 15 seconds – inside the cluster. `/metrics` is not exposed through the ingress.
+- **The dashboard is code** ([`k8s/dashboards/study-rag.json`](k8s/dashboards/study-rag.json)): a ConfigMap labelled `grafana_dashboard: "1"`, loaded by Grafana automatically and changed through pull requests like everything else.
+
+**What the dashboard answers, in order:** are there errors (5xx on user requests)? Is it slow – and is it the LLM (compare answer time with generation time)? Are answers getting worse (outcomes, retrieval score)? The built-in Kubernetes dashboards show CPU and memory per pod.
+
+**Lesson from tuning it:** the first version counted the readiness probe's `/health` 503s (sent while Ollama was stopped) as server errors and showed "11 errors" although no user request had failed. Errors now count only user-facing endpoints.
 
 ## API
 
@@ -188,6 +212,7 @@ Interactive docs at `/docs` (http://localhost:8000/docs with Compose, http://api
 | `GET /health` | Checks that Qdrant and Ollama are reachable (`503` if not) |
 | `POST /documents` | Uploads a PDF, saves it and indexes its slides |
 | `POST /ask` | Answers a question with citations and the retrieved slides |
+| `GET /metrics` | Prometheus metrics (on Kubernetes only reachable inside the cluster) |
 
 ```bash
 curl -X POST localhost:8000/ask -H "Content-Type: application/json" \
@@ -247,6 +272,7 @@ python -m app.rag.ask "What is max pooling?"
 ```text
 app/
 ├── config.py          # all settings, read from environment variables
+├── metrics.py         # Prometheus metrics definitions
 ├── ingest/
 │   ├── parse_pdf.py   # PDF → one chunk per slide (headers and slide builds removed)
 │   ├── embed.py       # texts → vectors via Ollama
@@ -264,7 +290,8 @@ tests/                 # unit tests (pytest)
 docker/                # Dockerfiles for API and UI
 docker-compose.yml     # Qdrant + API + UI
 k8s/                   # Kubernetes manifests (Kustomize) – what Argo CD deploys
-gitops/                # Argo CD values, Application and ImageUpdater
+└── dashboards/        # Grafana dashboard JSON
+gitops/                # Argo CD values, Applications (app + monitoring) and ImageUpdater
 scripts/               # cluster-up.sh, gitops-up.sh
 .github/workflows/     # CI: lint, tests, multi-arch image builds
 data/                  # lecture PDFs and Qdrant storage – git-ignored
@@ -283,6 +310,7 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 | CI | GitHub Actions, ruff, pytest, GHCR | Quality gate on every PR, multi-arch images on every merge |
 | Deployment | Kubernetes (minikube), Kustomize, Helm | Portable manifests; Helm installs Argo CD |
 | GitOps | Argo CD + Argo CD Image Updater | Pull-based deployment, self-healing, no cluster credentials in CI |
+| Monitoring | Prometheus + Grafana (kube-prometheus-stack) | The standard Kubernetes monitoring stack; dashboards as code |
 
 ## Design decisions
 
@@ -310,8 +338,9 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 - [x] **Phase 2 – API, UI, Docker Compose:** FastAPI, Streamlit UI, one-command start
 - [x] **Phase 3 – Evaluation and CI/CD:** 48-question eval set, Hit@5 / MRR / citation and refusal metrics, GitHub Actions quality gate, images on GHCR
 - [x] **Phase 4 – Kubernetes and GitOps:** manifests with probes and zero-downtime rollouts, ingress, Argo CD + Image Updater
-- [ ] **Phase 5 – Monitoring:** Prometheus + Grafana (latency, tokens/s, retrieval scores)
-- [ ] **Phase 6 – Extensions:** MCP server for Claude, quiz mode, topic overview per lecture, OCR / vision model for slide images, hybrid search and re-ranking
+- [x] **Phase 5 – Monitoring:** `/metrics` in the API, Prometheus + Grafana via Argo CD, dashboard as code
+- [ ] **Next:** Langfuse (per-question tracing), Redis (answer cache, chat history), security hardening (auth, rate limits, NetworkPolicies)
+- [ ] **Phase 6 – Extensions:** Terraform (same stack on a cloud cluster), MCP server for Claude, quiz mode, topic overview per lecture, OCR / vision model for slide images, hybrid search and re-ranking
 
 ## Note on lecture material
 
