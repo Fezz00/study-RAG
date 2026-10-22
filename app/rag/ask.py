@@ -8,6 +8,7 @@ import re
 import sys
 
 from app.config import MIN_SCORE, TOP_K
+from app.metrics import ANSWERS, RETRIEVAL_TOP_SCORE
 from app.rag.generate import NOT_COVERED, generate_answer
 from app.rag.retrieve import retrieve
 
@@ -37,21 +38,27 @@ def validate_citations(answer: str, slides: list[dict]) -> tuple[str, list[dict]
 
 def ask(question: str, top_k: int = TOP_K) -> dict:
     slides = retrieve(question, top_k=top_k)
+    if slides:
+        RETRIEVAL_TOP_SCORE.observe(slides[0]["score"])
 
     # Layer 1: below MIN_SCORE the best slide is clearly unrelated -> don't even ask the LLM.
     if not slides or slides[0]["score"] < MIN_SCORE:
+        ANSWERS.labels(outcome="refused_low_score").inc()
         return {"answer": NOT_COVERED, "citations": [], "sources": slides}
 
     # Layer 2: the strict prompt tells the model to cite or say NOT_COVERED.
     answer = generate_answer(question, slides)
     if NOT_COVERED in answer:
+        ANSWERS.labels(outcome="refused_by_model").inc()
         return {"answer": NOT_COVERED, "citations": [], "sources": slides}
 
     # Layer 3: check the citations in code instead of trusting the model.
     answer, citations = validate_citations(answer, slides)
     if not citations:
-        answer = NOT_COVERED
+        ANSWERS.labels(outcome="refused_no_citation").inc()
+        return {"answer": NOT_COVERED, "citations": [], "sources": slides}
 
+    ANSWERS.labels(outcome="answered").inc()
     return {"answer": answer, "citations": citations, "sources": slides}
 
 
