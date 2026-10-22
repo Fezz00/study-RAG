@@ -40,10 +40,14 @@
       "id": 3,
       "type": "stat",
       "title": "Server errors 5xx (last 1 h)",
+      "description": "Failed user requests (/ask, /documents). /health is left out: its 503 means 'Qdrant or Ollama unreachable' - a status report, not a crash.",
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
-        { "refId": "A", "expr": "sum(increase(http_request_duration_seconds_count{status=~\"5..\"}[1h])) or vector(0)" }
+        {
+          "refId": "A",
+          "expr": "round(sum(increase(http_request_duration_seconds_count{status=~\"5..\", path!~\"/health|/metrics\"}[1h]))) or vector(0)"
+        }
       ],
       "fieldConfig": {
         "defaults": {
