@@ -1,7 +1,7 @@
 # One entry point for the whole app. The ingress-nginx controller (minikube addon) routes by host name:
 #   http://study-rag.local      -> ui
-#   http://api.study-rag.local  -> api  (e.g. /docs, /health)
-# Qdrant gets no rule on purpose: the database stays reachable only inside the cluster.
+#   http://api.study-rag.local  -> api, but only the paths listed below
+# Not exposed on purpose: Qdrant (database) and the API's /metrics - Prometheus reads those inside the cluster.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -26,8 +26,37 @@ spec:
     - host: api.study-rag.local
       http:
         paths:
-          - path: /
+          # Only what clients need. Any other path (e.g. /metrics) gets 404 from the ingress.
+          - path: /ask
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000
+          - path: /documents
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000
+          - path: /docs # interactive API docs (see the security hardening issue)
             pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8000
+          - path: /openapi.json # the docs page loads the API description from here
+            pathType: Exact
             backend:
               service:
                 name: api
