@@ -1,5 +1,5 @@
 # Kustomize ties the manifests together: kubectl apply -k k8s/
-# Argo CD (GitOps) will read this same file.
+# Argo CD (GitOps) reads this same file.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -11,8 +11,19 @@ resources:
   - api.yaml
   - ui.yaml
   - ingress.yaml
+  - servicemonitor.yaml
 
-# The image versions to deploy. Later, CI will update these tags automatically.
+# The Grafana dashboard as a ConfigMap. Grafana loads every ConfigMap labelled grafana_dashboard=1.
+configMapGenerator:
+  - name: grafana-dashboard-study-rag
+    files:
+      - dashboards/study-rag.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      disableNameSuffixHash: true # keep a fixed name instead of adding a content hash
+
+# Default image versions. Argo CD Image Updater replaces them with the newest sha-... tags.
 images:
   - name: ghcr.io/fezz00/study-rag-api
     newTag: latest
