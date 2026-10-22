@@ -59,8 +59,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: api
+  labels:
+    app: api # lets the ServiceMonitor find this Service
 spec:
   selector:
     app: api
   ports:
-    - port: 8000
+    - name: http # the ServiceMonitor refers to the port by this name
+      port: 8000

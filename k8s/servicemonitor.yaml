@@ -1,0 +1,17 @@
+# Tells Prometheus: "read /metrics from the api Service every 15 seconds".
+# Prometheus reads it inside the cluster, so /metrics doesn't need to be public (see ingress.yaml).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api
+  annotations:
+    # This resource type comes with the monitoring stack; don't fail the sync if it isn't installed yet.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  selector:
+    matchLabels:
+      app: api # the api Service (it carries this label)
+  endpoints:
+    - port: http # the Service's port name
+      path: /metrics
+      interval: 15s
