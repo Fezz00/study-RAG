@@ -35,5 +35,5 @@ RETRIEVAL_TOP_SCORE = Histogram(
 ANSWERS = Counter(
     "rag_answers",  # exported as rag_answers_total
     "Questions handled, by outcome",
-    ["outcome"],  # answered | refused_low_score | refused_by_model | refused_no_citation
+    ["outcome"],  # answered | refused_low_score | refused_by_model | refused_no_citation | no_lectures
 )
