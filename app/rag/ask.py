@@ -14,6 +14,8 @@ from app.rag.retrieve import retrieve
 
 CITATION_PATTERN = re.compile(r"L\d+-s\d+")
 
+NO_LECTURES = "No lectures indexed yet. Upload a lecture PDF first."
+
 
 def validate_citations(answer: str, slides: list[dict]) -> tuple[str, list[dict]]:
     """Keep only citations of slides we actually retrieved.
@@ -38,11 +40,16 @@ def validate_citations(answer: str, slides: list[dict]) -> tuple[str, list[dict]
 
 def ask(question: str, top_k: int = TOP_K) -> dict:
     slides = retrieve(question, top_k=top_k)
-    if slides:
-        RETRIEVAL_TOP_SCORE.observe(slides[0]["score"])
+
+    # Nothing indexed at all: say so clearly instead of "Not covered".
+    if not slides:
+        ANSWERS.labels(outcome="no_lectures").inc()
+        return {"answer": NO_LECTURES, "citations": [], "sources": []}
+
+    RETRIEVAL_TOP_SCORE.observe(slides[0]["score"])
 
     # Layer 1: below MIN_SCORE the best slide is clearly unrelated -> don't even ask the LLM.
-    if not slides or slides[0]["score"] < MIN_SCORE:
+    if slides[0]["score"] < MIN_SCORE:
         ANSWERS.labels(outcome="refused_low_score").inc()
         return {"answer": NOT_COVERED, "citations": [], "sources": slides}
 
