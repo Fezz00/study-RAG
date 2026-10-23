@@ -13,7 +13,11 @@ def retrieve(question: str, top_k: int = TOP_K) -> list[dict]:
     """Embed the question and return the top_k closest slides, best first.
 
     Each result is the slide's payload plus its similarity score.
+    Returns an empty list if no lecture has been indexed yet (the collection doesn't exist).
     """
+    if not _client.collection_exists(COLLECTION):
+        return []
+
     query_vector = embed_texts([question])[0]
     response = _client.query_points(
         collection_name=COLLECTION,
