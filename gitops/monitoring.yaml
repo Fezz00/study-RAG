@@ -40,6 +40,12 @@ spec:
                 memory: 1Gi
 
         grafana:
+          # Admin login from a Secret we create by hand (scripts/gitops-up.sh), never stored in Git.
+          # Survives restarts - a password changed in Grafana's UI would be lost on the next restart.
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
           ingress:
             enabled: true
             ingressClassName: nginx
