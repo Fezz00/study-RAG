@@ -8,13 +8,18 @@ Two clean-up steps make retrieval better:
 - Progressive "build" slides (the same slide shown again with one more line) are
   skipped, so only the most complete version is indexed.
 
+Optionally, slides with images get a text description from a vision model (see describe.py),
+so diagrams and image-only slides become searchable too.
+
 Usage:
     python -m app.ingest.parse_pdf data/lecture04.pdf
 """
 
 import re
 import sys
+import time
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 
 import pymupdf
@@ -54,11 +59,18 @@ def is_build_of(lines: list[str], next_lines: list[str]) -> bool:
     return sum(line in next_set for line in lines) / len(lines) >= BUILD_OVERLAP
 
 
-def parse_pdf(pdf_path: str | Path, lecture_number: int | None = None) -> list[dict]:
+def parse_pdf(
+    pdf_path: str | Path,
+    lecture_number: int | None = None,
+    describe: Callable[[bytes], str] | None = None,
+) -> list[dict]:
     """Return one chunk per slide (page) of the PDF.
 
-    Slides without text after clean-up, earlier builds of the next slide and exact
-    repeats of an earlier slide are skipped.
+    Earlier builds of the next slide and exact repeats of an earlier slide are skipped.
+
+    describe: optional function that turns a slide image (PNG bytes) into a text description,
+    e.g. a vision model. If given, every kept slide that contains an image gets a "[Figure] ..."
+    line, and slides that only contain an image are kept instead of skipped.
     """
     pdf_path = Path(pdf_path)
     if lecture_number is None:
@@ -67,31 +79,46 @@ def parse_pdf(pdf_path: str | Path, lecture_number: int | None = None) -> list[d
     with pymupdf.open(pdf_path) as doc:
         raw = [[line.strip() for line in page.get_text().splitlines() if line.strip()] for page in doc]
 
-    boilerplate = boilerplate_lines(raw)
-    slides = []
-    for page_index, lines in enumerate(raw):
-        slide_number = page_index + 1  # pages are 0-based, slides start at 1
-        # Drop the header/footer and the printed slide number.
-        slides.append([line for line in lines if line not in boilerplate and line != str(slide_number)])
+        boilerplate = boilerplate_lines(raw)
+        slides = []
+        for page_index, lines in enumerate(raw):
+            slide_number = page_index + 1  # pages are 0-based, slides start at 1
+            # Drop the header/footer and the printed slide number.
+            slides.append([line for line in lines if line not in boilerplate and line != str(slide_number)])
 
-    chunks = []
-    seen_texts = set()
-    for page_index, lines in enumerate(slides):
-        text = "\n".join(lines)
-        next_lines = slides[page_index + 1] if page_index + 1 < len(slides) else []
-        if not text or text in seen_texts or is_build_of(lines, next_lines):
-            continue
-        seen_texts.add(text)
+        chunks = []
+        seen_texts = set()
+        for page_index, lines in enumerate(slides):
+            text = "\n".join(lines)
+            next_lines = slides[page_index + 1] if page_index + 1 < len(slides) else []
+            page = doc[page_index]
+            has_image = describe is not None and bool(page.get_images())
 
-        slide_number = page_index + 1
-        chunks.append(
-            {
-                "id": f"L{lecture_number:02d}-s{slide_number}",
-                "lecture": f"Lecture {lecture_number}",
-                "slide": slide_number,
-                "text": text,
-            }
-        )
+            if is_build_of(lines, next_lines) or (text and text in seen_texts):
+                continue
+            if not text and not has_image:
+                continue
+            if text:
+                seen_texts.add(text)
+
+            # Only slides we keep are described - vision models are slow.
+            if has_image:
+                start = time.perf_counter()
+                description = describe(page.get_pixmap(dpi=100).tobytes("png"))
+                text = f"{text}\n[Figure] {description}".strip()
+                # Progress output, so a long vision run doesn't look stuck.
+                seconds = time.perf_counter() - start
+                print(f"slide {page_index + 1}/{len(slides)} described in {seconds:.1f} s", flush=True)
+
+            slide_number = page_index + 1
+            chunks.append(
+                {
+                    "id": f"L{lecture_number:02d}-s{slide_number}",
+                    "lecture": f"Lecture {lecture_number}",
+                    "slide": slide_number,
+                    "text": text,
+                }
+            )
     return chunks
 
 
