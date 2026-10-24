@@ -46,3 +46,8 @@
 {"question": "What is reinforcement learning?", "expected_slides": [], "must_mention": []}
 {"question": "What is the capital of France?", "expected_slides": [], "must_mention": []}
 {"question": "How do I bake bread?", "expected_slides": [], "must_mention": []}
+{"question": "How many hidden units does the 2-layer network in the recap use?", "expected_slides": ["L05-s10"], "must_mention": ["100"]}
+{"question": "How does a color histogram turn an image into a feature vector?", "expected_slides": ["L05-s22"], "must_mention": ["color"]}
+{"question": "Which animal is used as the example image when mapping pixels to class scores?", "expected_slides": ["L05-s20", "L05-s21"], "must_mention": ["frog"]}
+{"question": "Which classes does the example CNN with a car input image output scores for?", "expected_slides": ["L05-s120"], "must_mention": ["truck"]}
+{"question": "What three viewpoints of a linear classifier does the recap show?", "expected_slides": ["L05-s6"], "must_mention": ["geometric"]}
