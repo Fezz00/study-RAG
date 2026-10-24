@@ -19,7 +19,8 @@ from qdrant_client.models import (
 )
 
 from app.config import QDRANT_COLLECTION as COLLECTION
-from app.config import QDRANT_URL
+from app.config import QDRANT_URL, VISION_MODEL
+from app.ingest.describe import describe_slide
 from app.ingest.embed import embed_texts
 from app.ingest.parse_pdf import parse_pdf
 
@@ -35,7 +36,11 @@ def point_id(slide_id: str) -> str:
 
 def index_pdf(pdf_path: str, client: QdrantClient) -> int:
     """Index one PDF and return how many slides were stored."""
-    chunks = parse_pdf(pdf_path)
+    # Fail fast: check that Qdrant answers before the slow parsing/vision step, not after it.
+    client.get_collections()
+
+    # With a vision model configured, slide images are described in words and indexed too.
+    chunks = parse_pdf(pdf_path, describe=describe_slide if VISION_MODEL else None)
     if not chunks:
         return 0
 
