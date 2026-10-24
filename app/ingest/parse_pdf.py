@@ -17,6 +17,7 @@ Usage:
 
 import re
 import sys
+import time
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -102,8 +103,12 @@ def parse_pdf(
 
             # Only slides we keep are described - vision models are slow.
             if has_image:
+                start = time.perf_counter()
                 description = describe(page.get_pixmap(dpi=100).tobytes("png"))
                 text = f"{text}\n[Figure] {description}".strip()
+                # Progress output, so a long vision run doesn't look stuck.
+                seconds = time.perf_counter() - start
+                print(f"slide {page_index + 1}/{len(slides)} described in {seconds:.1f} s", flush=True)
 
             slide_number = page_index + 1
             chunks.append(
