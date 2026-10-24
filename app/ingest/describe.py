@@ -10,6 +10,9 @@ from app.config import OLLAMA_URL, VISION_MODEL
 
 _client = ollama.Client(host=OLLAMA_URL)
 
+# 2-4 sentences are ~100 tokens; the cap only stops a model that keeps on talking.
+MAX_TOKENS = 300
+
 PROMPT = (
     "This is a slide from a university lecture. Describe its figures, diagrams, charts and formulas "
     "in 2-4 short factual sentences. Include numbers, labels and names you can read. "
@@ -22,5 +25,8 @@ def describe_slide(png: bytes) -> str:
     response = _client.chat(
         model=VISION_MODEL,
         messages=[{"role": "user", "content": PROMPT, "images": [png]}],
+        # No hidden reasoning, and a hard cap on the answer length: keeps each slide to seconds, not minutes.
+        think=False,
+        options={"num_predict": MAX_TOKENS},
     )
     return response.message.content.strip()
