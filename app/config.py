@@ -9,6 +9,8 @@ import os
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen3:4b-instruct")
+# Vision model that describes slide images while indexing. Empty = off (text only).
+VISION_MODEL = os.getenv("VISION_MODEL", "")
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "slides")
