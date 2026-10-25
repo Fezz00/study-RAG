@@ -111,7 +111,63 @@ def show_overview(number: int, refresh: bool) -> None:
         st.caption("Slides " + ", ".join(slide_id.split("-s")[1] for slide_id in topic["slides"]))
 
 
-ask_tab, overview_tab = st.tabs(["💬 Ask", "🗂️ Overview"])
+def lecture_picker(key: str) -> dict:
+    """Select box with the indexed lectures; each tab needs its own key."""
+    return st.selectbox(
+        "Lecture", lectures, format_func=lambda lec: f"{lec['lecture']} ({lec['slides']} slides)", key=key
+    )
+
+
+def new_quiz(number: int, count: int, topic: str) -> None:
+    """Ask the API for a quiz and keep it in session_state, so it survives the reruns while answering."""
+    with st.spinner("Writing and double-checking questions (about 10 s each)..."):
+        try:
+            response = requests.post(
+                f"{API_URL}/quiz",
+                json={"lecture": number, "count": count, "topic": topic.strip() or None},
+                timeout=600,
+            )
+        except requests.RequestException as error:
+            st.error(f"Could not reach the API: {error}")
+            return
+
+    if not response.ok:
+        st.error(f"API error {response.status_code}: {response.json().get('detail', response.text)}")
+        return
+
+    st.session_state.quiz = response.json()["questions"]
+    st.session_state.quiz_id = st.session_state.get("quiz_id", 0) + 1  # fresh keys, so old answers don't carry over
+    st.session_state.checked = False
+
+
+def show_quiz() -> None:
+    quiz, quiz_id = st.session_state.quiz, st.session_state.quiz_id
+    with st.form(f"quiz-{quiz_id}"):
+        for i, q in enumerate(quiz):
+            st.radio(f"**{i + 1}. {q['question']}**", q["options"], index=None, key=f"quiz-{quiz_id}-{i}")
+        if st.form_submit_button("Check answers"):
+            st.session_state.checked = True
+
+    if not st.session_state.checked:
+        return
+
+    # Grading is a simple comparison: the correct option is part of the quiz.
+    chosen = [st.session_state[f"quiz-{quiz_id}-{i}"] for i in range(len(quiz))]
+    score = sum(choice == q["options"][q["answer"]] for choice, q in zip(chosen, quiz))
+    st.subheader(f"Score: {score} / {len(quiz)}")
+    for i, (choice, q) in enumerate(zip(chosen, quiz), 1):
+        correct = q["options"][q["answer"]]
+        icon = "✅" if choice == correct else "❌"
+        with st.expander(f"{icon} {i}. {q['question']}", expanded=choice != correct):
+            if choice != correct:
+                st.write(f"Your answer: {choice or '–'}")
+            st.write(f"Correct: **{correct}**")
+            st.write(q["explanation"])
+            st.caption(f"Source: slide {q['slide_id'].split('-s')[1]}")
+
+
+ask_tab, overview_tab, quiz_tab = st.tabs(["💬 Ask", "🗂️ Overview", "📝 Quiz"])
+lectures = lecture_list()
 
 with ask_tab:
     # A form only reruns the script when the button is pressed, not on every keystroke.
@@ -122,15 +178,24 @@ with ask_tab:
         show_answer(question)
 
 with overview_tab:
-    lectures = lecture_list()
     if not lectures:
         st.info("No lectures indexed yet. Upload a lecture PDF first.")
     else:
-        lecture = st.selectbox(
-            "Lecture", lectures, format_func=lambda lec: f"{lec['lecture']} ({lec['slides']} slides)"
-        )
+        lecture = lecture_picker("overview-lecture")
         col_show, col_refresh = st.columns(2)
         if col_show.button("Show overview"):
             show_overview(lecture["number"], refresh=False)
         if col_refresh.button("Generate again", help="Ignore the saved overview and summarize the slides again"):
             show_overview(lecture["number"], refresh=True)
+
+with quiz_tab:
+    if not lectures:
+        st.info("No lectures indexed yet. Upload a lecture PDF first.")
+    else:
+        lecture = lecture_picker("quiz-lecture")
+        topic = st.text_input("Topic (optional)", placeholder="e.g. pooling – empty = whole lecture")
+        count = st.slider("Questions", min_value=1, max_value=10, value=5)
+        if st.button("New quiz"):
+            new_quiz(lecture["number"], count, topic)
+        if "quiz" in st.session_state:
+            show_quiz()
