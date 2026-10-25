@@ -50,3 +50,22 @@ class OverviewResponse(BaseModel):
     lecture: str
     slides: int
     topics: list[Topic]
+
+
+class QuizRequest(BaseModel):
+    lecture: int = Field(examples=[5])
+    count: int = Field(default=5, ge=1, le=10)
+    topic: str | None = Field(default=None, examples=["pooling"])
+
+
+class QuizQuestion(BaseModel):
+    question: str
+    options: list[str]
+    answer: int  # index of the correct option
+    explanation: str
+    slide_id: str
+
+
+class QuizResponse(BaseModel):
+    lecture: str
+    questions: list[QuizQuestion]
