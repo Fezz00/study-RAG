@@ -13,11 +13,21 @@ from fastapi import FastAPI, HTTPException, Request, Response, UploadFile
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from qdrant_client import QdrantClient
 
-from app.api.schemas import AskRequest, AskResponse, Citation, DocumentResponse, Source
+from app.api.schemas import (
+    AskRequest,
+    AskResponse,
+    Citation,
+    DocumentResponse,
+    Lecture,
+    OverviewResponse,
+    Source,
+)
 from app.config import DATA_DIR, OLLAMA_URL, QDRANT_URL
 from app.ingest.index import index_pdf
 from app.metrics import REQUEST_SECONDS
 from app.rag.ask import ask
+from app.rag.overview import get_overview
+from app.rag.retrieve import list_lectures
 
 app = FastAPI(title="Lecture Study Assistant")
 
@@ -101,3 +111,18 @@ def ask_question(request: AskRequest) -> AskResponse:
         citations=[Citation(**slide) for slide in result["citations"]],
         sources=[Source(slide_id=s["slide_id"], score=s["score"]) for s in result["sources"]],
     )
+
+
+@app.get("/lectures", response_model=list[Lecture])
+def lectures() -> list[Lecture]:
+    """All indexed lectures with their number of slides."""
+    return [Lecture(**lecture) for lecture in list_lectures()]
+
+
+@app.get("/lectures/{number}/overview", response_model=OverviewResponse)
+def lecture_overview(number: int, refresh: bool = False) -> OverviewResponse:
+    """The main topics of a lecture with their slides. The first call takes a few minutes, then it is saved."""
+    overview = get_overview(number, refresh=refresh)
+    if overview is None:
+        raise HTTPException(status_code=404, detail=f"Lecture {number} is not indexed.")
+    return OverviewResponse(**overview)
