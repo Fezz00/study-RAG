@@ -32,3 +32,21 @@ class AskResponse(BaseModel):
 class DocumentResponse(BaseModel):
     filename: str
     slides_indexed: int
+
+
+class Lecture(BaseModel):
+    number: int
+    lecture: str
+    slides: int
+
+
+class Topic(BaseModel):
+    title: str
+    summary: str
+    slides: list[str]
+
+
+class OverviewResponse(BaseModel):
+    lecture: str
+    slides: int
+    topics: list[Topic]
