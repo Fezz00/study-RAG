@@ -6,15 +6,19 @@ A self-hosted assistant that answers questions about lecture slides and cites th
 
 If the slides don't contain the answer, it says **"Not covered in the slides."** instead of guessing.
 
+Besides questions, it can give a **topic overview** of a whole lecture and generate a **multiple-choice quiz** from the slides – both with the slide numbers as sources.
+
 ![Demo: asking a question and getting an answer with slide citations](docs/demo.gif)
 
-> **Status:** Phase 5 done – measured with an eval set, checked by CI on every PR, deployed to Kubernetes with GitOps (merging a PR rolls out the new version automatically, without downtime), and monitored with Prometheus and Grafana.
+> **Status:** Phases 1–5 done – measured with an eval set, checked by CI on every PR, deployed to Kubernetes with GitOps (merging a PR rolls out the new version automatically, without downtime), and monitored with Prometheus and Grafana. Phase 6 extensions so far: slide images, lecture overview, quiz mode.
 
 ## Highlights
 
 - **Grounded answers with citations** – retrieval with Qdrant, answers from a local Qwen model, three layers against made-up answers
-- **Measured quality** – 48-question eval set: Hit@5 0.90, refusal accuracy 1.00
-- **CI quality gate** – lint, 26 unit tests and multi-arch image builds (amd64 + arm64, native runners) on every PR; `main` is protected
+- **Study modes** – a topic overview per lecture (map-reduce over all slides) and a multiple-choice quiz whose questions are self-checked before you see them
+- **Slide images** – an optional local vision model describes diagrams and figures, so image-only slides become searchable too
+- **Measured quality** – 53-question eval set: Hit@5 0.91 (0.87 without the vision model), refusal accuracy 1.00
+- **CI quality gate** – lint, 53 unit tests and multi-arch image builds (amd64 + arm64, native runners) on every PR; `main` is protected
 - **Kubernetes + GitOps** – Argo CD keeps the cluster identical to `k8s/` on `main`; Argo CD Image Updater deploys every new image; zero-downtime rolling updates and self-healing
 - **Monitoring** – the API exports Prometheus metrics (latency, LLM time, tokens/s, retrieval score, answer outcomes); a Grafana dashboard defined as code shows them live
 
@@ -27,7 +31,7 @@ ollama pull nomic-embed-text && ollama pull qwen3:4b-instruct
 docker compose up --build
 ```
 
-Open **http://localhost:8501**, upload a lecture PDF in the sidebar and ask a question.
+Open **http://localhost:8501**, upload a lecture PDF in the sidebar, then ask a question, open the lecture overview or start a quiz in the tabs.
 
 To run it on Kubernetes instead, see [Kubernetes and GitOps](#kubernetes-and-gitops).
 
@@ -78,6 +82,16 @@ flowchart LR
 
 A threshold alone isn't enough: *"What is a transformer attention mechanism?"* (not in the lecture) scored 0.618, higher than *"Who were Hubel and Wiesel?"* (in the lecture) at 0.593, because both sound like deep learning.
 
+### Slide images (optional)
+
+With `VISION_MODEL` set (e.g. `qwen3-vl:4b-instruct`, pulled with `ollama pull`), every kept slide that contains an image is rendered as a PNG and described in 2–4 sentences by the vision model. The description is added to the slide text as a `[Figure] ...` line before embedding, and slides that contain only an image are kept instead of skipped.
+
+```bash
+VISION_MODEL=qwen3-vl:4b-instruct python -m app.ingest.index data/lecture_5.pdf
+```
+
+Indexing then takes minutes instead of seconds (~6 s per image slide; lecture 5: 59 described slides), so it's off by default. Use the *instruct* (non-thinking) variant – the thinking version wrote hidden reasoning for minutes per slide.
+
 ### Lecture overview
 
 `GET /lectures/{n}/overview` (and the **Overview** tab in the UI) lists the main topics of a lecture, each with a short summary and its slides. Questions only need the 5 closest slides, but an overview needs all of them – about 10k tokens for lecture 5, more than fits in one prompt. So it works in two steps (**map-reduce**):
@@ -87,20 +101,31 @@ A threshold alone isn't enough: *"What is a transformer attention mechanism?"* (
 
 The model has to answer in a fixed JSON shape (Ollama structured output), and slide IDs it makes up are dropped, like in the citation check. Generating lecture 5 takes about 3 minutes, so the result is saved in `data/overviews/` (0.5 s afterwards) and deleted when the lecture is re-indexed.
 
+### Quiz mode
+
+`POST /quiz` (and the **Quiz** tab) generates multiple-choice questions from random slides of a lecture, or only from the slides about a topic (`"topic": "pooling"`; same `MIN_SCORE` guardrail as `/ask`). Every question comes from one slide and shows it as its source.
+
+1. **Write** – the model gets one slide and must answer in a fixed JSON shape: question, 4 options, index of the correct one, explanation.
+2. **Check the shape in code** – exactly 4 different options, a valid index.
+3. **Shuffle** the options – a small model puts the right answer first most of the time.
+4. **Self-check** – a second call gets the slide, the question and the shuffled options, but not the answer, and has to pick the answer itself. Only questions where both calls agree are kept.
+
+The self-check matters: about half of the generated questions fail it, and the ones I looked at really were broken – e.g. *"pooling layers add weights and biases"* marked as correct while the slide says *"Number of parameters: 0"*. Grading needs no model: the correct option is known, so the UI just compares. A quiz of 5 questions takes about 50 s.
+
 ## Evaluation
 
-`eval/questions.jsonl` holds 48 test questions for lecture 5: 40 with the slides that answer them, and 8 the lecture doesn't cover. `eval/run_eval.py` runs the real pipeline on all of them.
+`eval/questions.jsonl` holds 53 test questions for lecture 5: 45 with the slides that answer them (5 of them answerable only from a figure), and 8 the lecture doesn't cover. `eval/run_eval.py` runs the real pipeline on all of them.
 
 | Metric | Measures | Result |
 |---|---|---|
-| **Hit@5** | Share of questions with a correct slide among the 5 retrieved | **0.900** |
-| **MRR** | How high the first correct slide ranks (1.0 = always first) | 0.772 |
+| **Hit@5** | Share of questions with a correct slide among the 5 retrieved | **0.911** (text only: 0.867) |
+| **MRR** | How high the first correct slide ranks (1.0 = always first) | 0.773 (text only: 0.741) |
 | **Citation accuracy** | Share of cited slides that are correct | ~0.94 |
 | **Keyword coverage** | Share of key terms (`must_mention`) found in the answers | ~0.87 |
 | **Refusal accuracy** | Not-covered questions answered with "Not covered" | **1.000** |
 | **False refusal rate** | Covered questions wrongly refused | 0.125 |
 
-Retrieval metrics are deterministic; answer metrics vary by about ±0.03 between runs because of the LLM.
+Retrieval metrics are deterministic and measured on all 53 questions, with and without the vision model. The answer metrics were measured on the first 48 questions and vary by about ±0.03 between runs because of the LLM.
 
 ```bash
 python -m eval.run_eval --retrieval-only   # Hit@5 + MRR in seconds, no LLM
@@ -112,6 +137,7 @@ The script exits with an error if Hit@5 falls below `--min-hit` (default 0.8). T
 **What the eval showed:**
 - **Switching models.** The first model, `qwen3:4b`, is a *thinking* model: it wrote ~3,500 hidden reasoning tokens before every answer (~100 s). `qwen3:4b-instruct` answers directly in ~2 s with the same scores.
 - **Slide builds crowd out answers.** The misses came from near-identical slides filling the top 5. Removing headers and builds kept Hit@5 at 0.900 and made the index 29 % smaller; the remaining misses come from a worked example spread over six slides – a candidate for retrieval-time de-duplication or re-ranking.
+- **Slide images help where the answer is only in a figure.** With the vision model, Hit@5 went from 0.867 to 0.911: both questions whose answer exists only in a figure were found, none without it. Questions about figures whose slide title already names the topic were found either way.
 - **Grading mistakes count too.** One question was graded too strictly; fixing the test (not the system) is a separate, labelled change.
 
 ## Tests and CI
@@ -119,10 +145,10 @@ The script exits with an error if Hit@5 falls below `--min-hit` (default 0.8). T
 ```bash
 pip install -r requirements-dev.txt
 ruff check .      # lint
-pytest -v         # 26 unit tests, ~1 s, no Ollama or Qdrant needed
+pytest -v         # 53 unit tests, ~1 s, no Ollama or Qdrant needed
 ```
 
-The unit tests cover PDF parsing (on PDFs generated in the test), citation validation, the API (with the RAG pipeline mocked) and the eval helpers.
+The unit tests cover PDF parsing (on PDFs generated in the test), slide image descriptions, citation validation, the lecture overview, quiz generation and its self-check, the API and the eval helpers. Ollama is replaced by fakes, so the tests check the code around the models, not the models.
 
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every pull request and every push to `main`:
 
@@ -222,6 +248,7 @@ Interactive docs at `/docs` (http://localhost:8000/docs with Compose, http://api
 | `POST /documents` | Uploads a PDF, saves it and indexes its slides |
 | `POST /ask` | Answers a question with citations and the retrieved slides |
 | `GET /lectures` | Lists the indexed lectures with their number of slides |
+| `POST /quiz` | Multiple-choice questions from a lecture, optionally about a topic (`count` 1–10) |
 | `GET /lectures/{n}/overview` | Main topics of a lecture with their slides (`?refresh=true` generates it again) |
 | `GET /metrics` | Prometheus metrics (on Kubernetes only reachable inside the cluster) |
 
@@ -248,12 +275,13 @@ All settings are environment variables. Docker Compose reads them from `.env` (s
 |---|---|---|
 | `CHAT_MODEL` | `qwen3:4b-instruct` | Answer model |
 | `EMBED_MODEL` | `nomic-embed-text` | Embedding model |
+| `VISION_MODEL` | *(empty = off)* | Vision model that describes slide images while indexing |
 | `TOP_K` | `5` | Number of slides retrieved per question |
 | `MIN_SCORE` | `0.5` | Minimum similarity before the LLM is asked |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server |
 | `QDRANT_URL` | `http://localhost:6333` | Qdrant server |
 | `QDRANT_COLLECTION` | `slides` | Qdrant collection name |
-| `DATA_DIR` | `data` | Where uploaded PDFs are stored |
+| `DATA_DIR` | `data` | Where uploaded PDFs and saved lecture overviews are stored |
 | `API_URL` | `http://localhost:8000` | API address used by the UI |
 
 ## Development without Docker
@@ -276,6 +304,8 @@ Or straight from the terminal:
 ```bash
 python -m app.ingest.index data/lecture_5.pdf
 python -m app.rag.ask "What is max pooling?"
+python -m app.rag.overview 5
+python -m app.rag.quiz 5 "pooling"
 ```
 
 ## Project structure
@@ -286,17 +316,19 @@ app/
 ├── metrics.py         # Prometheus metrics definitions
 ├── ingest/
 │   ├── parse_pdf.py   # PDF → one chunk per slide (headers and slide builds removed)
+│   ├── describe.py    # slide image → text description via a vision model (optional)
 │   ├── embed.py       # texts → vectors via Ollama
 │   └── index.py       # parse → embed → store in Qdrant (replaces a lecture on re-index)
 ├── rag/
 │   ├── retrieve.py    # question → top-k most similar slides; all slides of a lecture
 │   ├── generate.py    # strict prompt with labelled slides → Qwen → answer
 │   ├── ask.py         # full pipeline + threshold + citation validation (CLI)
-│   └── overview.py    # map-reduce summary of a whole lecture, saved in data/overviews/
+│   ├── overview.py    # map-reduce summary of a whole lecture, saved in data/overviews/
+│   └── quiz.py        # multiple-choice questions from slides, with a self-check
 └── api/
     ├── main.py        # FastAPI endpoints
     └── schemas.py     # request and response models
-ui/app.py              # Streamlit UI, talks to the API over HTTP
+ui/app.py              # Streamlit UI (Ask, Overview, Quiz tabs), talks to the API over HTTP
 eval/                  # eval questions + scoring script
 tests/                 # unit tests (pytest)
 docker/                # Dockerfiles for API and UI
@@ -317,7 +349,8 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 | Embeddings | `nomic-embed-text` via Ollama | Small BERT-style encoder, good for English technical text |
 | Vector database | Qdrant | One container, simple Python client, metadata filters |
 | LLM | `qwen3:4b-instruct` via Ollama | Open model, runs locally, answers without a slow "thinking" phase |
-| API / UI | FastAPI + uvicorn / Streamlit | Validation and interactive docs from type hints / a web UI in ~80 lines |
+| Vision (optional) | `qwen3-vl:4b-instruct` via Ollama | Small local vision model for slide figures; non-thinking, so seconds per slide |
+| API / UI | FastAPI + uvicorn / Streamlit | Validation and interactive docs from type hints / a web UI in plain Python |
 | Packaging | Docker, Docker Compose | One command starts the whole system |
 | CI | GitHub Actions, ruff, pytest, GHCR | Quality gate on every PR, multi-arch images on every merge |
 | Deployment | Kubernetes (minikube), Kustomize, Helm | Portable manifests; Helm installs Argo CD |
@@ -329,6 +362,7 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 - **One chunk per slide.** Slides are already small, self-contained units, and it makes citations exact: every chunk *is* a citable slide.
 - **No framework (LangChain, LlamaIndex).** The pipeline is about 150 lines of plain Python, and every step stays visible and easy to debug.
 - **Don't trust the model's citations.** Small models sometimes invent slide IDs, so they're checked against the retrieved slides in code.
+- **Don't trust the model's JSON either.** Overview and quiz use structured output (the reply must match a JSON schema), and the code still checks it: invented slide IDs are dropped, and every quiz question must survive a second, independent answer.
 - **UI and API as separate services.** The API can serve other clients (curl, the eval script, a future React page), and each part has its own small image.
 - **Eval locally, tests in CI.** The lecture PDFs must stay private, so CI runs fast unit tests and the eval runs on the developer machine.
 - **Pull-based GitOps.** The local cluster isn't reachable from GitHub, and pull-based deployment needs no cluster credentials in CI. Argo CD reaches out to GitHub instead.
@@ -337,10 +371,10 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 
 ## Known limitations
 
-- Only text is extracted. Images, diagrams and text inside images are ignored, and image-only slides are skipped.
+- Slide images are only described when `VISION_MODEL` is set; indexing then takes minutes instead of seconds, and the descriptions can contain small mistakes.
 - The embedding model is English-only: questions in other languages with translated technical terms find the right slides less reliably.
 - The eval set covers one lecture.
-- Asking before any lecture is indexed returns `500` instead of a helpful message (tracked in an issue).
+- The quiz self-check catches a wrong answer key, but not a small wrong detail inside the correct option (e.g. a filter size of 3x3 instead of 5x5).
 - The image pull secret is created by hand (`cluster-up.sh`), not stored in Git; a production setup would use Sealed Secrets or External Secrets.
 - Ollama runs outside the cluster on the host, because Docker on macOS has no GPU access.
 
@@ -348,11 +382,12 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 
 - [x] **Phase 1 – RAG prototype:** parse, embed, retrieve, answer with citations
 - [x] **Phase 2 – API, UI, Docker Compose:** FastAPI, Streamlit UI, one-command start
-- [x] **Phase 3 – Evaluation and CI/CD:** 48-question eval set, Hit@5 / MRR / citation and refusal metrics, GitHub Actions quality gate, images on GHCR
+- [x] **Phase 3 – Evaluation and CI/CD:** eval set (now 53 questions), Hit@5 / MRR / citation and refusal metrics, GitHub Actions quality gate, images on GHCR
 - [x] **Phase 4 – Kubernetes and GitOps:** manifests with probes and zero-downtime rollouts, ingress, Argo CD + Image Updater
 - [x] **Phase 5 – Monitoring:** `/metrics` in the API, Prometheus + Grafana via Argo CD, dashboard as code
 - [ ] **Next:** Langfuse (per-question tracing), Redis (answer cache, chat history), security hardening (auth, rate limits, NetworkPolicies)
-- [ ] **Phase 6 – Extensions:** Terraform (same stack on a cloud cluster), MCP server for Claude, quiz mode, topic overview per lecture, OCR / vision model for slide images, hybrid search and re-ranking
+- [x] **Phase 6 – Study features:** vision model for slide images, topic overview per lecture, quiz mode
+- [ ] **Phase 6 – Next:** MCP server for Claude, Terraform (same stack on a cloud cluster), hybrid search and re-ranking
 
 ## Note on lecture material
 
