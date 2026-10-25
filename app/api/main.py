@@ -20,6 +20,8 @@ from app.api.schemas import (
     DocumentResponse,
     Lecture,
     OverviewResponse,
+    QuizRequest,
+    QuizResponse,
     Source,
 )
 from app.config import DATA_DIR, OLLAMA_URL, QDRANT_URL
@@ -27,6 +29,7 @@ from app.ingest.index import index_pdf
 from app.metrics import REQUEST_SECONDS
 from app.rag.ask import ask
 from app.rag.overview import get_overview
+from app.rag.quiz import make_quiz
 from app.rag.retrieve import list_lectures
 
 app = FastAPI(title="Lecture Study Assistant")
@@ -126,3 +129,13 @@ def lecture_overview(number: int, refresh: bool = False) -> OverviewResponse:
     if overview is None:
         raise HTTPException(status_code=404, detail=f"Lecture {number} is not indexed.")
     return OverviewResponse(**overview)
+
+
+@app.post("/quiz", response_model=QuizResponse)
+def quiz(request: QuizRequest) -> QuizResponse:
+    """Multiple-choice questions from random slides of a lecture, optionally only about a topic."""
+    questions = make_quiz(request.lecture, count=request.count, topic=request.topic)
+    if not questions:
+        about = f" about '{request.topic}'" if request.topic else ""
+        raise HTTPException(status_code=404, detail=f"No slides{about} found in Lecture {request.lecture}.")
+    return QuizResponse(lecture=f"Lecture {request.lecture}", questions=questions)
