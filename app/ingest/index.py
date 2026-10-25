@@ -6,6 +6,7 @@ Usage:
 
 import sys
 import uuid
+from pathlib import Path
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
@@ -22,7 +23,8 @@ from app.config import QDRANT_COLLECTION as COLLECTION
 from app.config import QDRANT_URL, VISION_MODEL
 from app.ingest.describe import describe_slide
 from app.ingest.embed import embed_texts
-from app.ingest.parse_pdf import parse_pdf
+from app.ingest.parse_pdf import lecture_number_from_filename, parse_pdf
+from app.rag.overview import overview_path
 
 
 def point_id(slide_id: str) -> str:
@@ -74,6 +76,8 @@ def index_pdf(pdf_path: str, client: QdrantClient) -> int:
         for chunk, vector in zip(chunks, vectors)
     ]
     client.upsert(collection_name=COLLECTION, points=points)
+    # The saved overview describes the old slides, so it is generated again on the next request.
+    overview_path(lecture_number_from_filename(Path(pdf_path))).unlink(missing_ok=True)
     return len(points)
 
 

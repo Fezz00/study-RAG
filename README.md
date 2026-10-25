@@ -78,6 +78,15 @@ flowchart LR
 
 A threshold alone isn't enough: *"What is a transformer attention mechanism?"* (not in the lecture) scored 0.618, higher than *"Who were Hubel and Wiesel?"* (in the lecture) at 0.593, because both sound like deep learning.
 
+### Lecture overview
+
+`GET /lectures/{n}/overview` (and the **Overview** tab in the UI) lists the main topics of a lecture, each with a short summary and its slides. Questions only need the 5 closest slides, but an overview needs all of them – about 10k tokens for lecture 5, more than fits in one prompt. So it works in two steps (**map-reduce**):
+
+1. **Map** – each batch of 15 slides is summarized into 1–4 topics.
+2. **Reduce** – the topics of all batches are merged into the main topics of the lecture.
+
+The model has to answer in a fixed JSON shape (Ollama structured output), and slide IDs it makes up are dropped, like in the citation check. Generating lecture 5 takes about 3 minutes, so the result is saved in `data/overviews/` (0.5 s afterwards) and deleted when the lecture is re-indexed.
+
 ## Evaluation
 
 `eval/questions.jsonl` holds 48 test questions for lecture 5: 40 with the slides that answer them, and 8 the lecture doesn't cover. `eval/run_eval.py` runs the real pipeline on all of them.
@@ -212,6 +221,8 @@ Interactive docs at `/docs` (http://localhost:8000/docs with Compose, http://api
 | `GET /health` | Checks that Qdrant and Ollama are reachable (`503` if not) |
 | `POST /documents` | Uploads a PDF, saves it and indexes its slides |
 | `POST /ask` | Answers a question with citations and the retrieved slides |
+| `GET /lectures` | Lists the indexed lectures with their number of slides |
+| `GET /lectures/{n}/overview` | Main topics of a lecture with their slides (`?refresh=true` generates it again) |
 | `GET /metrics` | Prometheus metrics (on Kubernetes only reachable inside the cluster) |
 
 ```bash
@@ -278,9 +289,10 @@ app/
 │   ├── embed.py       # texts → vectors via Ollama
 │   └── index.py       # parse → embed → store in Qdrant (replaces a lecture on re-index)
 ├── rag/
-│   ├── retrieve.py    # question → top-k most similar slides
+│   ├── retrieve.py    # question → top-k most similar slides; all slides of a lecture
 │   ├── generate.py    # strict prompt with labelled slides → Qwen → answer
-│   └── ask.py         # full pipeline + threshold + citation validation (CLI)
+│   ├── ask.py         # full pipeline + threshold + citation validation (CLI)
+│   └── overview.py    # map-reduce summary of a whole lecture, saved in data/overviews/
 └── api/
     ├── main.py        # FastAPI endpoints
     └── schemas.py     # request and response models
