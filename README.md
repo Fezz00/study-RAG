@@ -6,19 +6,20 @@ A self-hosted assistant that answers questions about lecture slides and cites th
 
 If the slides don't contain the answer, it says **"Not covered in the slides."** instead of guessing.
 
-Besides questions, it can give a **topic overview** of a whole lecture and generate a **multiple-choice quiz** from the slides – both with the slide numbers as sources.
+Besides questions, it can give a **topic overview** of a whole lecture and generate a **multiple-choice quiz** from the slides – both with the slide numbers as sources. An **MCP server** makes all of it available as tools in Claude Code or Claude Desktop.
 
 ![Demo: asking a question and getting an answer with slide citations](docs/demo.gif)
 
-> **Status:** Phases 1–5 done – measured with an eval set, checked by CI on every PR, deployed to Kubernetes with GitOps (merging a PR rolls out the new version automatically, without downtime), and monitored with Prometheus and Grafana. Phase 6 extensions so far: slide images, lecture overview, quiz mode.
+> **Status:** Phases 1–5 done – measured with an eval set, checked by CI on every PR, deployed to Kubernetes with GitOps (merging a PR rolls out the new version automatically, without downtime), and monitored with Prometheus and Grafana. Phase 6 extensions: slide images, lecture overview, quiz mode, MCP server.
 
 ## Highlights
 
 - **Grounded answers with citations** – retrieval with Qdrant, answers from a local Qwen model, three layers against made-up answers
 - **Study modes** – a topic overview per lecture (map-reduce over all slides) and a multiple-choice quiz whose questions are self-checked before you see them
+- **MCP server** – the assistant as tools for Claude Code / Claude Desktop (*"quiz me on lecture 5"*), built as a thin client of the API like the UI
 - **Slide images** – an optional local vision model describes diagrams and figures, so image-only slides become searchable too
 - **Measured quality** – 53-question eval set: Hit@5 0.91 (0.87 without the vision model), refusal accuracy 1.00
-- **CI quality gate** – lint, 53 unit tests and multi-arch image builds (amd64 + arm64, native runners) on every PR; `main` is protected
+- **CI quality gate** – lint, 58 unit tests and multi-arch image builds (amd64 + arm64, native runners) on every PR; `main` is protected
 - **Kubernetes + GitOps** – Argo CD keeps the cluster identical to `k8s/` on `main`; Argo CD Image Updater deploys every new image; zero-downtime rolling updates and self-healing
 - **Monitoring** – the API exports Prometheus metrics (latency, LLM time, tokens/s, retrieval score, answer outcomes); a Grafana dashboard defined as code shows them live
 
@@ -112,6 +113,31 @@ The model has to answer in a fixed JSON shape (Ollama structured output), and sl
 
 The self-check matters: about half of the generated questions fail it, and the ones I looked at really were broken – e.g. *"pooling layers add weights and biases"* marked as correct while the slide says *"Number of parameters: 0"*. Grading needs no model: the correct option is known, so the UI just compares. A quiz of 5 questions takes about 50 s.
 
+### MCP server
+
+[MCP (Model Context Protocol)](https://modelcontextprotocol.io) is a standard way to give an AI app new tools. `mcp_server/server.py` exposes the assistant as four read-only tools:
+
+| Tool | Calls | Does |
+|---|---|---|
+| `list_lectures` | `GET /lectures` | Which lectures are indexed |
+| `ask_lectures` | `POST /ask` | Answer with slide citations, or "Not covered in the slides." |
+| `lecture_overview` | `GET /lectures/{n}/overview` | Main topics of a lecture with their slides |
+| `quiz_questions` | `POST /quiz` | Multiple-choice questions with solutions (the tool description tells the AI to hide them until you answer) |
+
+```mermaid
+flowchart LR
+    C[Claude Code /<br/>Claude Desktop] -- MCP over stdio --> M[mcp_server] -- HTTP --> A[FastAPI] --> Q[(Qdrant)] & O[Ollama]
+```
+
+Like the UI, it is a **thin client of the API** – the usual way to build an MCP server for an existing service. The guardrails, metrics and model calls stay in one place, MCP calls show up in Grafana like any other request, and the same server works against uvicorn or the Kubernetes deployment by changing `API_URL`. There is no upload tool on purpose: an AI assistant can read the slides, but not change what is indexed.
+
+```bash
+pip install -r mcp_server/requirements.txt
+claude mcp add study-rag -e API_URL=http://localhost:8000 -- "$PWD/.venv/bin/python" "$PWD/mcp_server/server.py"
+```
+
+Then, with the API running, ask Claude e.g. *"Which lectures do I have?"* or *"Quiz me on pooling in lecture 5"*.
+
 ## Evaluation
 
 `eval/questions.jsonl` holds 53 test questions for lecture 5: 45 with the slides that answer them (5 of them answerable only from a figure), and 8 the lecture doesn't cover. `eval/run_eval.py` runs the real pipeline on all of them.
@@ -145,10 +171,10 @@ The script exits with an error if Hit@5 falls below `--min-hit` (default 0.8). T
 ```bash
 pip install -r requirements-dev.txt
 ruff check .      # lint
-pytest -v         # 53 unit tests, ~1 s, no Ollama or Qdrant needed
+pytest -v         # 58 unit tests, ~1 s, no Ollama or Qdrant needed
 ```
 
-The unit tests cover PDF parsing (on PDFs generated in the test), slide image descriptions, citation validation, the lecture overview, quiz generation and its self-check, the API and the eval helpers. Ollama is replaced by fakes, so the tests check the code around the models, not the models.
+The unit tests cover PDF parsing (on PDFs generated in the test), slide image descriptions, citation validation, the lecture overview, quiz generation and its self-check, the API, the MCP server (real MCP calls over an in-memory connection, with a fake API behind it) and the eval helpers. Ollama is replaced by fakes, so the tests check the code around the models, not the models.
 
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every pull request and every push to `main`:
 
@@ -328,6 +354,7 @@ app/
 └── api/
     ├── main.py        # FastAPI endpoints
     └── schemas.py     # request and response models
+mcp_server/server.py   # MCP server: the API as tools for Claude, a thin HTTP client like the UI
 ui/app.py              # Streamlit UI (Ask, Overview, Quiz tabs), talks to the API over HTTP
 eval/                  # eval questions + scoring script
 tests/                 # unit tests (pytest)
@@ -350,6 +377,7 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 | Vector database | Qdrant | One container, simple Python client, metadata filters |
 | LLM | `qwen3:4b-instruct` via Ollama | Open model, runs locally, answers without a slow "thinking" phase |
 | Vision (optional) | `qwen3-vl:4b-instruct` via Ollama | Small local vision model for slide figures; non-thinking, so seconds per slide |
+| MCP server | Official `mcp` Python SDK (v2), stdio transport | The standard protocol for giving AI apps tools; type hints become the tool schemas |
 | API / UI | FastAPI + uvicorn / Streamlit | Validation and interactive docs from type hints / a web UI in plain Python |
 | Packaging | Docker, Docker Compose | One command starts the whole system |
 | CI | GitHub Actions, ruff, pytest, GHCR | Quality gate on every PR, multi-arch images on every merge |
@@ -385,9 +413,10 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 - [x] **Phase 3 – Evaluation and CI/CD:** eval set (now 53 questions), Hit@5 / MRR / citation and refusal metrics, GitHub Actions quality gate, images on GHCR
 - [x] **Phase 4 – Kubernetes and GitOps:** manifests with probes and zero-downtime rollouts, ingress, Argo CD + Image Updater
 - [x] **Phase 5 – Monitoring:** `/metrics` in the API, Prometheus + Grafana via Argo CD, dashboard as code
-- [ ] **Next:** Langfuse (per-question tracing), Redis (answer cache, chat history), security hardening (auth, rate limits, NetworkPolicies)
 - [x] **Phase 6 – Study features:** vision model for slide images, topic overview per lecture, quiz mode
-- [ ] **Phase 6 – Next:** MCP server for Claude, Terraform (same stack on a cloud cluster), hybrid search and re-ranking
+- [x] **Phase 6 – MCP server:** the assistant as read-only tools for Claude Code / Claude Desktop
+- [ ] **Next:** Langfuse (per-question tracing), Terraform (same stack on a cloud cluster), hybrid search and re-ranking
+- [ ] **Later:** Redis (answer cache, chat history), security hardening (auth, rate limits, NetworkPolicies)
 
 ## Note on lecture material
 
