@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Fezz00/study-RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/Fezz00/study-RAG/actions/workflows/ci.yml)
 
-A self-hosted assistant that answers questions about lecture slides and cites the exact deck and slide for every claim, e.g. *"Lecture 5, slide 103"*. It runs only on open models on your own machine, so the slides never leave it.
+A self-hosted assistant that answers questions about lecture slides and cites the exact deck and slide for every claim, e.g. *"Lecture 5, slide 103"*. It runs only on open models on your own machine, so the slides never leave it (unless you connect it to a cloud AI app through the [MCP server](#mcp-server)).
 
 If the slides don't contain the answer, it says **"Not covered in the slides."** instead of guessing.
 
@@ -130,6 +130,8 @@ flowchart LR
 ```
 
 Like the UI, it is a **thin client of the API** – the usual way to build an MCP server for an existing service. The guardrails, metrics and model calls stay in one place, MCP calls show up in Grafana like any other request, and the same server works against uvicorn or the Kubernetes deployment by changing `API_URL`. There is no upload tool on purpose: an AI assistant can read the slides, but not change what is indexed.
+
+> **Privacy:** the app itself runs fully locally. When you use it through a cloud AI app like Claude, the tool results – answers and quotes from your slides – become part of that conversation and are sent to the AI provider. The tools cost nothing extra; the results count toward your normal usage of that app.
 
 ```bash
 pip install -r mcp_server/requirements.txt
