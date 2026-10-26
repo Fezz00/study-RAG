@@ -16,7 +16,8 @@ MAX_TOKENS = 300
 PROMPT = (
     "This is a slide from a university lecture. Describe its figures, diagrams, charts and formulas "
     "in 2-4 short factual sentences. Include numbers, labels and names you can read. "
-    "Don't describe layout, colors or decoration, and don't add knowledge that isn't shown."
+    "Don't describe layout, colors or decoration, and don't add knowledge that isn't shown. "
+    "Ignore headers, footers, logos, course names, dates and slide numbers."
 )
 
 
