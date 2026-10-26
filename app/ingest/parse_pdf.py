@@ -37,8 +37,7 @@ def lecture_number_from_filename(pdf_path: Path) -> int:
     match = re.search(r"\d+", pdf_path.stem)
     if match is None:
         raise ValueError(
-            f"No lecture number in file name '{pdf_path.name}'. "
-            "Rename it like 'lecture04.pdf' or pass lecture_number."
+            f"No lecture number in file name '{pdf_path.name}'. Rename it like 'lecture04.pdf' or pass lecture_number."
         )
     return int(match.group())
 
