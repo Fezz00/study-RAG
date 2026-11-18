@@ -423,3 +423,7 @@ data/                  # lecture PDFs and Qdrant storage – git-ignored
 ## Note on lecture material
 
 Lecture slides belong to their authors and are not part of this repository. `data/` is git-ignored; use your own slides or freely licensed material.
+
+## License
+
+[AGPL-3.0](LICENSE). The API uses [PyMuPDF](https://pymupdf.readthedocs.io), which is licensed under AGPL-3.0, so this project and the published Docker images are licensed under AGPL-3.0 as well.
